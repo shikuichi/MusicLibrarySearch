@@ -1,0 +1,18 @@
+{
+  "name": "music-library-search",
+  "version": "1.5.0",
+  "description": "ブラウザ完結型の音楽ライブラリ検索・インデックスツール",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "music",
+    "search",
+    "id3",
+    "web-worker",
+    "audio"
+  ],
+  "author": "しくいち (Shikuichi)",
+  "license": "GPL-3.0"
+}

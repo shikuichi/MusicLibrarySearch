@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<!-- ライセンス表示 -->
+<!--
+作品名：音楽ファイル検索ツール Ver.1.1
+作者　：しくいち (Shikuichi)
+著作権：Copyright (C) 2016-2026 Shikuichi
+
+【ライセンスおよび利用条件について】
+このプログラムはフリーソフトウェアです。あなたは、フリーソフトウェア財団が発行した 
+GNU 一般公衆利用許諾書（バージョン3、またはそれ以降のライセンス）の定める条件の下で、このプログラムを再頒布または改変することができます。
+作者のスタンスとして、商用利用・改変・再配布などは、本ライセンスの範囲内において完全にご自由に行っていただいて構いません。
+本プログラムは、有用であることを願って配布されていますが、全くの無保証です。
+市場性および特定の目的に対する適合性についての暗黙の保証もありません。
+ライセンスの全文（公式規定）については、以下のリンク先を各自参照してください。
+
+■ GNU General Public License, version 3 (GPLv3)
+https://www.gnu.org/licenses/gpl-3.0.html
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+For the full text of the license, please refer to:
+https://www.gnu.org/licenses/gpl-3.0.html
+-->
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Library Search</title>
+    <style>
+        :root {
+            --bg-color: #f3f7f4; --container-bg: #ffffff; --text-color: #2c3531; --text-muted: #616f68;
+            --border-color: #cfe1d6; --active-bg: #e1eedb; --accent-color: #4f772d; --accent-hover: #31572c;
+            --export-color: #386641; --import-color: #6a994e; --shadow-color: rgba(49, 87, 44, 0.06);
+            --tooltip-bg: #2c3531; --tooltip-text: #ffffff;
+            --cancel-color: #bae1cc; --cancel-text: #204030; --cancel-hover: #a3cfb6;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #141a16; --container-bg: #1c241f; --text-color: #e1e7e4; --text-muted: #8fa095;
+                --border-color: #2d3b33; --active-bg: #25332a; --accent-color: #74a150; --accent-hover: #92be6d;
+                --export-color: #52805c; --import-color: #83b66b; --shadow-color: rgba(0, 0, 0, 0.3);
+                --tooltip-bg: #cfe1d6; --tooltip-text: #141a16;
+                --cancel-color: #2d3b33; --cancel-text: #e1e7e4; --cancel-hover: #3a4d42;
+            }
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0; padding: 20px; background: var(--bg-color); color: var(--text-color);
+            display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 40px);
+        }
+        .container {
+            width: 100%; max-width: 1240px; background: var(--container-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 24px; display: flex; flex-direction: column;
+            height: calc(100vh - 88px); box-shadow: 0 8px 30px var(--shadow-color); box-sizing: border-box;
+        }
+        .app-title { margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: var(--accent-color); display: flex; align-items: center; gap: 8px; }
+        .control-panel { display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+        .action-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .io-group { display: flex; align-items: center; gap: 12px; }
+        .interactive-anchor { position: relative; display: inline-flex; align-items: center; }
+        .interactive-anchor.disabled { opacity: 0.35; pointer-events: none; }
+        .tooltip-box {
+            position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px);
+            background: var(--tooltip-bg); color: var(--tooltip-text); padding: 8px 12px; border-radius: 6px;
+            font-size: 12px; line-height: 1.4; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0; pointer-events: none; z-index: 100; transition: all 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .tooltip-box::after {
+            content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            border: 5px solid transparent; border-top-color: var(--tooltip-bg);
+        }
+        .interactive-anchor:hover .tooltip-box, .interactive-anchor:focus-within .tooltip-box { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+        .search-row { display: flex; gap: 12px; align-items: center; width: 100%; margin-top: 4px; }
+        input[type="text"] { flex: 1; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font-size: 15px; transition: all 0.2s; }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(116, 161, 80, 0.2); }
+        select {
+            padding: 12px 32px 12px 16px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font-size: 14px; cursor: pointer; min-width: 140px; appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23616f68' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+            background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
+        }
+        select.sm-select { padding: 6px 28px 6px 12px; font-size: 12.5px; min-width: 100px; background-position: right 8px center; background-size: 14px; }
+        .btn-search { padding: 12px 24px; background: var(--accent-color); color: #ffffff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
+        .btn-search:hover { background: var(--accent-hover); }
+        .btn-search:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn-label { padding: 10px 18px; color: #ffffff; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; user-select: none; white-space: nowrap; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; border: none; }
+        .bg-scan { background: var(--accent-color); } .bg-scan:hover { background: var(--accent-hover); }
+        .bg-import { background: var(--import-color); } .bg-import:hover { opacity: 0.9; }
+        .bg-export { background: var(--export-color); } .bg-export:hover { opacity: 0.9; }
+        .bg-cancel { background: var(--cancel-color); color: var(--cancel-text); display: none; } .bg-cancel:hover { background: var(--cancel-hover); }
+        input[type="file"] { display: none; }
+        .checkbox-zone { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); user-select: none; cursor: pointer; }
+        .checkbox-zone input { cursor: pointer; width: 15px; height: 15px; accent-color: var(--accent-color); }
+        .status-bar { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted); padding: 10px 4px 6px 4px; gap: 16px; overflow: hidden; }
+        #meta-info { font-weight: 600; color: var(--accent-color); white-space: nowrap; }
+        #progress-info { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); flex: 1; }
+        .list-container { flex: 1; overflow: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--container-bg); }
+        .track-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; table-layout: fixed; min-width: 1060px; }
+        .track-table th, .track-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+        .track-table th { background: var(--bg-color); position: sticky; top: 0; z-index: 10; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; }
+        .track-item { transition: background 0.1s; } .track-item:hover { background: var(--active-bg); }
+        .track-path { cursor: pointer; color: var(--text-muted); font-family: monospace; font-size: 12.5px; transition: all 0.15s; }
+        .track-path:hover { color: var(--accent-color); background: rgba(116, 161, 80, 0.08); }
+        .track-path.copied { color: var(--export-color) !important; font-weight: bold; background: rgba(56, 102, 65, 0.1); }
+        .app-footer { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color); text-align: center; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+        .app-footer .privacy-muted { display: block; font-size: 11px; margin-top: 4px; opacity: 0.75; letter-spacing: 0.2px; }
+        
+        #mobile-lockout {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--container-bg); z-index: 9999; display: none;
+            justify-content: center; align-items: center; padding: 32px; box-sizing: border-box;
+        }
+        .lockout-box { text-align: center; max-width: 480px; border: 1px solid var(--border-color); padding: 32px; border-radius: 12px; background: var(--bg-color); box-shadow: 0 10px 40px var(--shadow-color); }
+        .lockout-box h2 { margin: 0 0 16px 0; color: #d90429; font-size: 20px; }
+        .lockout-box p { font-size: 14px; line-height: 1.6; color: var(--text-color); margin: 0; }
+    </style>
+</head>
+<body>
+
+<div id="mobile-lockout">
+    <div class="lockout-box">
+        <h2>モバイル環境非対応</h2>
+        <p>大変申し訳ありませんが、本システムはスマートフォンやタブレットなどのモバイル環境には対応しておりません。パソコンよりご利用ください。</p>
+    </div>
+</div>
+
+<div class="container">
+    <h1 class="app-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+        Music Library Search
+    </h1>
+
+    <div class="control-panel">
+        <div class="action-row">
+            <div class="io-group">
+                <div class="interactive-anchor" id="folder-pick-anchor">
+                    <label class="btn-label bg-scan" id="lbl-folder-input" tabindex="0">
+                        フォルダを選択
+                        <input type="file" id="folder-input" webkitdirectory directory multiple>
+                    </label>
+                    <button id="btn-cancel" class="btn-label bg-cancel" tabindex="0">処理を中止</button>
+                    <div class="tooltip-box" id="folder-tooltip">音楽ファイルを置いている全体フォルダ(ミュージック等)を選択してください。</div>
+                </div>
+                <div class="interactive-anchor">
+                    <label class="checkbox-zone" tabindex="0">
+                        <input type="checkbox" id="parse-id3-toggle" checked>
+                        楽曲の詳細情報を取得する(MP3ファイルのみ対応)
+                    </label>
+                    <div class="tooltip-box">※MP3ファイルに含まれるタグ情報を取得し、曲名やアーティスト名の解析精度を高めることができます。</div>
+                </div>
+                <div class="interactive-anchor">
+                    <select id="cpu-load-speed" class="sm-select">
+                        <option value="0">高速 (推奨・CPU負荷高め)</option>
+                        <option value="3">中速 (負荷軽減・バランス)</option>
+                        <option value="12">低負荷 (CPU抑制・低速処理)</option>
+                    </select>
+                    <div class="tooltip-box">楽曲情報取得時のCPU使用率と動作速度を調節できます。</div>
+                </div>
+            </div>
+
+            <div class="io-group">
+                <div class="interactive-anchor">
+                    <label class="btn-label bg-import" id="lbl-json-import" tabindex="0">
+                        インポート(JSON方式)
+                        <input type="file" id="json-import-input" accept=".json">
+                    </label>
+                    <div class="tooltip-box">以前保存した楽曲のリストデータを読み込みます。</div>
+                </div>
+                <div class="interactive-anchor" id="export-anchor">
+                    <label id="btn-export" class="btn-label bg-export disabled" tabindex="0">
+                        リストデータを出力(エクスポート)
+                    </label>
+                    <div class="tooltip-box" id="export-tooltip-text">楽曲データが読み込まれると、リストデータの出力が可能になります。</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="search-row">
+            <select id="search-mode" disabled>
+                <option value="all">すべてから検索</option>
+                <option value="title">曲名</option>
+                <option value="artist">アーティスト名</option>
+                <option value="album">アルバム名</option>
+            </select>
+            <input type="text" id="search-input" placeholder="キーワードを入力して検索ボタンを押してください（スペース区切りでAND検索可能）..." disabled>
+            <button id="search-button" class="btn-search" disabled>検索</button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div id="meta-info">ファイル総数が多い場合に画面表示が遅延することがあります</div>
+        <div id="progress-info"></div>
+    </div>
+
+    <div class="list-container">
+        <table class="track-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">タイトル</th>
+                    <th style="width: 20%;">アーティスト</th>
+                    <th style="width: 20%;">アルバム</th>
+                    <th style="width: 35%;">ファイルパス (クリックでクリップボードへコピー)</th>
+                </tr>
+            </thead>
+            <tbody id="track-list"></tbody>
+        </table>
+    </div>
+
+    <footer class="app-footer">
+        <div>©2016-<span id="copy-year"></span> しくいちの散歩道</div>
+        <span class="privacy-muted">※処理はすべてブラウザ内で完結するため、外部へデータを送信することは一切ありません。</span>
+    </footer>
+</div>
+
+<script>
+    // 画面横幅のみによるストレートなモバイルロックアウト判定 (横幅600px以下)
+    (() => {
+        const checkResolution = () => {
+            if (window.innerWidth <= 600) {
+                document.getElementById('mobile-lockout').style.display = 'flex';
+            } else {
+                document.getElementById('mobile-lockout').style.display = 'none';
+            }
+        };
+        checkResolution();
+        window.addEventListener('resize', checkResolution);
+    })();
+
+    const workerBlob = new Blob([`
+        let extSet = null;
+        let currentDelay = 0;
+
+        const guessMeta = (relPath, filename) => {
+            let title = filename.replace(/\\.[^/.]+$/, ""), artist = "Unknown Artist", album = "Unknown Album";
+            const pts = relPath.split('/');
+            if (pts.length >= 3) { artist = pts[pts.length - 3]; album = pts[pts.length - 2]; }
+            else if (pts.length === 2) album = pts[0];
+
+            for (let rx of [/ \\- /, / \\– /, / _ /]) {
+                if (rx.test(title)) {
+                    const pc = title.split(rx);
+                    if (pc.length >= 2) {
+                        if (artist === "Unknown Artist") artist = pc[0].trim();
+                        title = pc.slice(1).join(" - ").trim();
+                        break;
+                    }
+                }
+            }
+            return { title: title.replace(/^[0-9]{1,3}[\\.\\s\\-_~：]+/, "").trim(), artist, album };
+        };
+
+        const parseID3v2 = (file) => {
+            return new Promise((res) => {
+                const r = new FileReader();
+                r.onload = ev => {
+                    const buf = ev.target.result, view = new DataView(buf);
+                    if (buf.byteLength < 10 || view.getUint8(0) !== 0x49 || view.getUint8(1) !== 0x44 || view.getUint8(2) !== 0x33) return res({});
+                    const tags = {}, total = ((view.getUint8(6)&127)<<21)|((view.getUint8(7)&127)<<14)|((view.getUint8(8)&127)<<7)|(view.getUint8(9)&127);
+                    const limit = Math.min(buf.byteLength, total + 10), dec16 = new TextDecoder("utf-16"), dec8 = new TextDecoder("utf-8");
+                    let off = 10;
+                    while (off < limit - 10) {
+                        const id = String.fromCharCode(view.getUint8(off), view.getUint8(off+1), view.getUint8(off+2), view.getUint8(off+3));
+                        if (!/^[A-Z0-9]{4}$/.test(id)) break;
+                        const sz = (view.getUint8(off+4)<<24)|(view.getUint8(off+5)<<16)|(view.getUint8(off+6)<<8)|view.getUint8(off+7);
+                        if (sz <= 0 || off + 10 + sz > limit) break;
+                        let k = id === "TIT2" ? "title" : id === "TPE1" ? "artist" : id === "TALB" ? "album" : null;
+                        if (k) {
+                            try {
+                                const tBuf = buf.slice(off + 11, off + 10 + sz);
+                                tags[k] = (view.getUint8(off+10) === 1 ? dec16.decode(tBuf) : dec8.decode(tBuf)).replace(/\\0+$/, "").trim();
+                            } catch(err){}
+                        }
+                        off += 10 + sz;
+                    }
+                    res(tags);
+                };
+                r.onerror = () => res({}); r.readAsArrayBuffer(file.slice(0, 32768));
+            });
+        };
+
+        self.onmessage = async function(e) {
+            const { type, extensions, parseID3, delay, chunk, isLast, totalCount, startIndex } = e.data;
+            
+            if (type === 'init') {
+                extSet = new Set(extensions);
+                return;
+            }
+            
+            // 処理途中の速度変更通知を受け取る処理
+            if (type === 'speed_update') {
+                currentDelay = delay;
+                return;
+            }
+
+            if (type === 'process') {
+                currentDelay = delay;
+                const chunkResults = [];
+                let lastNotifyTime = Date.now();
+
+                for (let i = 0; i < chunk.length; i++) {
+                    const f = chunk[i];
+                    const dotIdx = f.name.lastIndexOf('.');
+                    if (dotIdx === -1) continue;
+                    const ext = f.name.substring(dotIdx).toLowerCase();
+                    if (!extSet.has(ext)) continue;
+
+                    const isMp3 = (ext === '.mp3');
+                    const tags = (parseID3 && isMp3) ? await parseID3v2(f) : {};
+                    const guess = guessMeta(f.webkitRelativePath, f.name);
+
+                    chunkResults.push({
+                        name: f.name, path: f.webkitRelativePath,
+                        title: tags.title || guess.title, artist: tags.artist || guess.artist, album: tags.album || guess.album
+                    });
+
+                    const globalCurrent = startIndex + i + 1;
+                    const now = Date.now();
+                    
+                    if (now - lastNotifyTime > 100 || globalCurrent === totalCount) {
+                        self.postMessage({ 
+                            type: 'progress', 
+                            current: globalCurrent, 
+                            total: totalCount,
+                            currentPath: f.webkitRelativePath
+                        });
+                        lastNotifyTime = now;
+                    }
+
+                    if (currentDelay > 0) {
+                        await new Promise(r => setTimeout(r, currentDelay));
+                    }
+                }
+
+                self.postMessage({ type: 'chunk_complete', results: chunkResults, isLast });
+            }
+        };
+    `], { type: 'application/javascript' });
+
+    const $ = id => document.getElementById(id);
+    const el = {
+        folder: $('folder-input'), lblFolder: $('lbl-folder-input'), btnCancel: $('btn-cancel'),
+        import: $('json-import-input'), lblImport: $('lbl-json-import'), export: $('btn-export'),
+        anchor: $('export-anchor'), tooltip: $('export-tooltip-text'), toggle: $('parse-id3-toggle'),
+        input: $('search-input'), mode: $('search-mode'), btn: $('search-button'),
+        list: $('track-list'), meta: $('meta-info'), prog: $('progress-info'), year: $('copy-year'),
+        speed: $('cpu-load-speed'), folderTooltip: $('folder-tooltip')
+    };
+
+    el.year.textContent = new Date().getFullYear();
+
+    let allTracks = [], filteredTracks = [];
+    const EXTENSIONS = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.wma', '.aif', '.aiff', '.alac', '.ape', '.opus', '.mpc', '.dsf', '.dff', '.wv', '.mid', '.midi', '.tta', '.amr', '.caf', '.mka'];
+    let processingWorker = null;
+    let isCanceled = false;
+    let dialogSafetyTimer = null;
+
+    // スキャン処理中に実行速度設定が変更されたときの割り込みハンドラ
+    // 変更された速度タイプに応じて、次の処理単位（チャンクサイズ）も動的にスイッチさせます
+    let getDynamicChunkSize = () => {
+        const val = parseInt(el.speed.value, 10);
+        if (val === 0) return 10000; // 高速時の塊
+        if (val === 3) return 5000;  // 中速時の塊
+        return 1000;                 // 低負荷時の塊
+    };
+
+    el.speed.addEventListener('change', () => {
+        if (processingWorker && !isCanceled) {
+            const delayValue = parseInt(el.speed.value, 10);
+            // 実行中のWorkerに対して、ウェイト時間をリアルタイム変更させる指令を送信
+            processingWorker.postMessage({
+                type: 'speed_update',
+                delay: delayValue
+            });
+        }
+    });
+
+    window.addEventListener('beforeunload', e => {
+        if (allTracks.length > 0) {
+            e.preventDefault();
+            e.returnValue = '読み込み済みの楽曲インデックスデータは消去されます。よろしければ事前にリストデータを出力(エクスポート)してください。';
+        }
+    });
+
+    el.lblFolder.addEventListener('click', () => {
+        if (el.meta.textContent === "読み込んでいます..." || el.meta.textContent.startsWith("解析中:")) return;
+
+        el.meta.textContent = "処理準備中...";
+        el.prog.textContent = "フォルダ選択ダイアログが開いています。対象フォルダを指定してください...";
+
+        if (dialogSafetyTimer) clearTimeout(dialogSafetyTimer);
+        dialogSafetyTimer = setTimeout(() => {
+            if (el.meta.textContent === "処理準備中..." && el.folder.files.length === 0) {
+                resetMetaToDefault();
+                el.prog.textContent = "";
+            }
+        }, 10000);
+    });
+
+    el.folder.addEventListener('change', e => {
+        if (dialogSafetyTimer) clearTimeout(dialogSafetyTimer);
+        isCanceled = false;
+        
+        el.meta.textContent = "読み込んでいます...";
+        el.prog.textContent = "OSからファイル構造の展開を受け取っています。データ量に応じて開始までしばらく時間がかかります...";
+        
+        el.lblFolder.style.display = 'none';
+        el.btnCancel.style.display = 'inline-flex';
+        el.folderTooltip.textContent = "現在実行中のスキャン処理を安全にストップさせます。";
+        setDisabled(true);
+        updateExportState();
+
+        setTimeout(() => {
+            if (isCanceled) {
+                resetInputControls();
+                return;
+            }
+
+            const files = Array.from(e.target.files);
+            if (!files.length) {
+                resetInputControls();
+                resetMetaToDefault();
+                el.prog.textContent = "";
+                return;
+            }
+
+            el.prog.textContent = "フォルダ内部構造のスキャン準備中...";
+            allTracks = []; filteredTracks = [];
+
+            if (processingWorker) processingWorker.terminate();
+            processingWorker = new Worker(URL.createObjectURL(workerBlob));
+            processingWorker.postMessage({ type: 'init', extensions: EXTENSIONS });
+
+            const totalCount = files.length;
+            let currentOffset = 0;
+
+            // 内部関数：現在のプルダウン設定値から動的な塊(ChunkSize)を算出しつつ、次のまとまりを送信
+            const sendNextChunk = () => {
+                if (currentOffset >= totalCount || isCanceled) return;
+                
+                const chunkSize = getDynamicChunkSize();
+                const end = Math.min(currentOffset + chunkSize, totalCount);
+                const chunk = files.slice(currentOffset, end);
+                const isLast = (end >= totalCount);
+
+                processingWorker.postMessage({
+                    type: 'process',
+                    chunk,
+                    parseID3: el.toggle.checked,
+                    delay: parseInt(el.speed.value, 10),
+                    isLast,
+                    totalCount,
+                    startIndex: currentOffset
+                });
+                currentOffset = end;
+            };
+
+            processingWorker.onmessage = function(evt) {
+                if (isCanceled) return;
+                const data = evt.data;
+                
+                if (data.type === 'progress') {
+                    el.meta.textContent = `解析中: ${data.current} / ${data.total} 件 (${Math.round((data.current / data.total) * 100)}%)`;
+                    el.prog.textContent = `▶ 処理中: ${data.currentPath}`;
+                } else if (data.type === 'chunk_complete') {
+                    if (data.results && data.results.length > 0) {
+                        allTracks.push(...data.results);
+                    }
+                    
+                    if (!data.isLast) {
+                        sendNextChunk();
+                    } else {
+                        el.meta.textContent = "ファイナライズ処理中...";
+                        el.prog.textContent = "インデックス構造を最適化しています(並び替え)...";
+                        
+                        setTimeout(() => {
+                            stopWorkerOnly();
+                            
+                            allTracks.sort((a, b) => a.path.localeCompare(b.path));
+                            filteredTracks = [...allTracks];
+                            render();
+                            
+                            el.lblFolder.style.display = 'none';
+                            el.btnCancel.style.display = 'none';
+                            
+                            const totalTracks = allTracks.length;
+                            
+                            const maxTimeoutSeconds = Math.max(8, Math.min(240, Math.ceil(totalTracks * 0.0004)));
+                            const lagThresholdMs = Math.max(80, Math.min(250, 50 + (totalTracks * 0.0003)));
+                            const memoryDropBytes = Math.max(10, Math.min(60, 5 + (totalTracks * 0.00005))) * 1024 * 1024;
+                            const requiredSmoothFrames = totalTracks > 100000 ? 20 : 8;
+                            
+                            let lastMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                            let elapsedSeconds = 0;
+                            let secondCounter = 0;
+                            let lastTime = performance.now();
+                            let hasLagged = false;
+                            let smoothFrameCount = 0;
+                            
+                            const detectGCEndDynamic = () => {
+                                if (isCanceled) return;
+                                
+                                const now = performance.now();
+                                const delta = now - lastTime;
+                                lastTime = now;
+                                
+                                secondCounter += delta;
+                                if (secondCounter >= 1000) {
+                                    elapsedSeconds += Math.floor(secondCounter / 1000);
+                                    secondCounter %= 1000;
+                                }
+                                
+                                el.meta.textContent = `システム最適化中... (${elapsedSeconds} 秒経過)`;
+                                el.prog.textContent = "※データの展開に伴い、ブラウザ内部で蓄積メモリの自動クリーンアップを実行しています。完了するまでそのままお待ちください...";
+                                
+                                if (performance.memory) {
+                                    const currentMemory = performance.memory.usedJSHeapSize;
+                                    if (lastMemory - currentMemory > memoryDropBytes) {
+                                        unlockAfterGC("メモリの最適化を確認しました");
+                                        return;
+                                    }
+                                    lastMemory = currentMemory;
+                                }
+                                
+                                if (delta > lagThresholdMs) {
+                                    hasLagged = true;
+                                    smoothFrameCount = 0; 
+                                } else if (hasLagged) {
+                                    smoothFrameCount++;
+                                    if (smoothFrameCount >= requiredSmoothFrames) {
+                                        unlockAfterGC("ブラウザの応答が安定しました");
+                                        return;
+                                    }
+                                }
+                                
+                                if (elapsedSeconds >= maxTimeoutSeconds) {
+                                    unlockAfterGC("最適化処理を完了しました");
+                                } else {
+                                    requestAnimationFrame(detectGCEndDynamic);
+                                }
+                            };
+                            
+                            setTimeout(() => {
+                                lastTime = performance.now();
+                                requestAnimationFrame(detectGCEndDynamic);
+                            }, 200);
+                            
+                        }, 10);
+                    }
+                }
+            };
+
+            sendNextChunk();
+        }, 1);
+    });
+
+    const unlockAfterGC = (reason) => {
+        console.log(`[GC_SCALE_DETECTOR] Unlock Triggered: ${reason}`);
+        el.prog.textContent = "";
+        updateMeta();
+        updateExportState();
+        setDisabled(false);
+        resetInputControls();
+    };
+
+    el.btnCancel.addEventListener('click', () => {
+        isCanceled = true;
+        stopWorkerOnly();
+        resetInputControls();
+        allTracks = []; filteredTracks = [];
+        el.list.innerHTML = '';
+        el.meta.textContent = "処理が中止されました";
+        el.prog.textContent = "";
+        updateExportState();
+    });
+
+    const stopWorkerOnly = () => {
+        if (processingWorker) {
+            processingWorker.terminate();
+            processingWorker = null;
+        }
+    };
+
+    const resetInputControls = () => {
+        el.folder.value = '';
+        el.lblFolder.style.display = 'inline-flex';
+        el.btnCancel.style.display = 'none';
+        el.folderTooltip.textContent = "音楽ファイルを置いている全体フォルダ(ミュージック等)を選択してください。";
+    };
+
+    const resetMetaToDefault = () => {
+        el.meta.textContent = "ファイル総数が多い場合に画面表示が遅延することがあります";
+    };
+
+    el.export.addEventListener('click', () => {
+        if (!allTracks.length) return;
+        const blob = new Blob([JSON.stringify(allTracks, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `music_archive_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+    });
+
+    el.import.addEventListener('change', e => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        el.meta.textContent = "インポート中...";
+        el.prog.textContent = "JSONファイルを解析しています...";
+        r.onload = evt => {
+            try {
+                const data = JSON.parse(evt.target.result);
+                if (!Array.isArray(data)) throw new Error('データ形式が不正です。');
+                allTracks = data;
+                allTracks.sort((a, b) => a.path.localeCompare(b.path));
+                filteredTracks = [...allTracks];
+                render();
+                updateMeta();
+                updateExportState();
+                setDisabled(false);
+                el.import.value = '';
+                el.prog.textContent = "";
+            } catch (err) { alert(`読み込み失敗:\n${err.message}`); resetMetaToDefault(); el.prog.textContent = ""; }
+        };
+        r.readAsText(f);
+    });
+
+    const setDisabled = d => {
+        el.input.disabled = d; el.mode.disabled = d; el.btn.disabled = d;
+        if (!d) el.input.focus();
+    };
+
+    const updateExportState = () => {
+        const hasData = allTracks.length > 0;
+        el.export.classList.toggle('disabled', !hasData);
+        el.anchor.classList.toggle('disabled', !hasData);
+        el.tooltip.textContent = hasData ? "現在読み込んでいる楽曲のリストデータを保存(出力)します。" : "楽曲データが読み込まれると、リストデータの出力が可能になります。";
+    };
+
+    const render = () => {
+        el.list.innerHTML = '';
+        const frag = document.createDocumentFragment();
+        const displayLimit = 1000;
+        const itemsToRender = filteredTracks.slice(0, displayLimit);
+
+        itemsToRender.forEach(t => {
+            const tr = document.createElement('tr'); tr.className = 'track-item';
+            const wPath = t.path.replace(/\//g, '\\');
+            const tdP = document.createElement('td'); tdP.className = 'track-path'; tdP.title = wPath; tdP.textContent = wPath;
+            tdP.addEventListener('click', e => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(wPath).then(() => {
+                    tdP.textContent = "クリップボードにコピーしました！"; tdP.classList.add('copied');
+                    setTimeout(() => { tdP.textContent = wPath; tdP.classList.remove('copied'); }, 1200);
+                });
+            });
+            tr.innerHTML = `<td title="${esc(t.title)}">${esc(t.title)}</td><td title="${esc(t.artist)}">${esc(t.artist)}</td><td title="${esc(t.album)}">${esc(t.album)}</td>`;
+            tr.appendChild(tdP); frag.appendChild(tr);
+        });
+        el.list.appendChild(frag);
+    };
+
+    const filter = () => {
+        const q = el.input.value.toLowerCase().trim(), m = el.mode.value;
+        
+        if (!q) {
+            filteredTracks = [...allTracks];
+        } else {
+            const keywords = q.split(/[\s\u3000]+/).filter(k => k.length > 0);
+
+            filteredTracks = allTracks.filter(t => {
+                const tTitle = t.title.toLowerCase();
+                const tArtist = t.artist.toLowerCase();
+                const tAlbum = t.album.toLowerCase();
+                const tPath = t.path.toLowerCase();
+
+                return keywords.every(kw => {
+                    if (m === 'title') return tTitle.includes(kw);
+                    if (m === 'artist') return tArtist.includes(kw);
+                    if (m === 'album') return tAlbum.includes(kw);
+                    return tTitle.includes(kw) || tArtist.includes(kw) || tAlbum.includes(kw) || tPath.includes(kw);
+                });
+            });
+        }
+        render(); updateMeta();
+    };
+
+    el.btn.addEventListener('click', filter);
+    el.input.addEventListener('keydown', e => e.key === 'Enter' && filter());
+    el.mode.addEventListener('change', filter);
+    
+    const updateMeta = () => {
+        const displayLimit = 1000;
+        let baseText = allTracks.length === filteredTracks.length 
+            ? `総登録数: ${allTracks.length} 曲` 
+            : `絞り込み結果: ${filteredTracks.length} 曲 / 総登録数: ${allTracks.length} 曲`;
+        
+        if (filteredTracks.length > displayLimit) {
+            baseText += ` (※上位 ${displayLimit} 件表示中)`;
+        }
+        el.meta.textContent = baseText;
+    };
+    
+    const esc = s => s ? s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;') : "";
+</script>
+</body>
+</html>
